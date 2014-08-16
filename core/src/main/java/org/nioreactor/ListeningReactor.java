@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 Pedro Ribeiro
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.nioreactor;
 
 import org.nioreactor.util.Preconditions;
@@ -100,9 +116,16 @@ public class ListeningReactor extends Thread {
             mainLock.unlock();
         }
 
+        try {
+            this.serverChannel.socket().bind(this.config.bindAddress(), this.config.backlogSize());
+            this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        } catch (final IOException e) {
+            // set the status to inactive and let the client decide what to do
+            status = ReactorStatus.INACTIVE;
+            throw e;
+        }
+
         this.dispatcher.start();
-        this.serverChannel.socket().bind(this.config.bindAddress(), this.config.backlogSize());
-        this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
         this.start();
     }
 

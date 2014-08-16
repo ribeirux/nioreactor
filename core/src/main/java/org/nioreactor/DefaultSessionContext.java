@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 Pedro Ribeiro
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.nioreactor;
 
 import org.nioreactor.util.Preconditions;
@@ -26,7 +42,7 @@ public class DefaultSessionContext implements SessionContext {
     private final ReentrantLock mainLock = new ReentrantLock();
     private final SelectionKey key;
     private final ByteChannel channel;
-    private final Map<String, Object> attributes;
+    private final Map<AttributeKey<?>, Object> attributes;
     private final DefaultDispatcher dispatcher;
     private volatile SessionStatus status = SessionStatus.ACTIVE;
     private volatile int socketTimeout = 0;
@@ -137,18 +153,21 @@ public class DefaultSessionContext implements SessionContext {
     }
 
     @Override
-    public Object getAttribute(final String name) {
-        return this.attributes.get(name);
+    @SuppressWarnings("unckecked")
+    public <T> T putAttribute(final AttributeKey<T> key, final T value) {
+        return (T) this.attributes.put(key, value);
     }
 
     @Override
-    public Object removeAttribute(final String name) {
-        return this.attributes.remove(name);
+    @SuppressWarnings("unckecked")
+    public <T> T getAttribute(final AttributeKey<T> key) {
+        return (T) this.attributes.get(key);
     }
 
     @Override
-    public void setAttribute(final String name, final Object obj) {
-        this.attributes.put(name, obj);
+    @SuppressWarnings("unckecked")
+    public <T> T removeAttribute(final AttributeKey<T> key) {
+        return (T) this.attributes.remove(key);
     }
 
     @Override
