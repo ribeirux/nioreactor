@@ -7,7 +7,7 @@ import java.net.SocketAddress;
 
 /**
  * Fluent reactor config.
- *
+ * <p/>
  * Created by ribeirux on 20/07/14.
  */
 public final class ReactorConfig {

@@ -45,6 +45,10 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
         this.closedSessions = new ConcurrentLinkedQueue<>();
     }
 
+    private static SessionContext getSession(final SelectionKey key) {
+        return (SessionContext) key.attachment();
+    }
+
     public void dispatch(final SocketChannel socketChannel) {
         this.newChannels.add(Preconditions.checkNotNull(socketChannel));
         this.selector.wakeup();
@@ -63,7 +67,6 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
             while (this.status == ReactorStatus.ACTIVE || !this.sessions.isEmpty()) {
                 final int readyCount = this.selector.select();
                 if (this.status == ReactorStatus.SHUTTING_DOWN) {
-                    // Try to close things out nicely
                     closeSessions();
                     closeNewChannels();
                 }
@@ -89,6 +92,11 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
         }
     }
 
+    @Override
+    public void await() throws InterruptedException {
+        join();
+    }
+
     /**
      * Attempts graceful shutdown of this I/O reactor.
      */
@@ -97,14 +105,13 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
         mainLock.lock();
         try {
             if (this.status.compareTo(ReactorStatus.ACTIVE) > 0) {
-                // already (being) shutdown
                 return;
             }
 
             // if inactive, just close the opened selector
             if (this.status == ReactorStatus.INACTIVE) {
+                doShutdown();
                 this.status = ReactorStatus.SHUT_DOWN;
-                closeSelector();
                 return;
             }
             this.status = ReactorStatus.SHUTTING_DOWN;
@@ -245,10 +252,6 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
                 }
             }
         }
-    }
-
-    private SessionContext getSession(final SelectionKey key) {
-        return (SessionContext) key.attachment();
     }
 
     private void queueClosedSession(final SessionContext session) {

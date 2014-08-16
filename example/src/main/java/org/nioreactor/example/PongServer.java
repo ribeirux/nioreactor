@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 
 /**
  * Time Server example.
- *
+ * <p/>
  * Created by ribeirux on 02/08/14.
  */
 public final class PongServer {
@@ -34,7 +34,7 @@ public final class PongServer {
         try {
             final ListeningReactor ioReactor = new ListeningReactor(config);
             try {
-                ioReactor.start();
+                ioReactor.bind();
                 LOGGER.info("Server started. Press any key to shutdown the server");
                 System.in.read();
             } finally {
@@ -63,7 +63,8 @@ public final class PongServer {
             session.setSocketTimeout(2000);
         }
 
-        public void inputReady(final SessionContext session) {}
+        public void inputReady(final SessionContext session) {
+        }
 
         public void outputReady(final SessionContext session) {
             buffer.rewind();

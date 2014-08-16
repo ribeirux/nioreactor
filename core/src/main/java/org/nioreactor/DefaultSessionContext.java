@@ -38,6 +38,30 @@ public class DefaultSessionContext implements SessionContext {
         this.attributes = new ConcurrentHashMap<>();
     }
 
+    private static void formatAddress(final StringBuilder buffer, final SocketAddress socketAddress) {
+        if (socketAddress instanceof InetSocketAddress) {
+            final InetSocketAddress address = ((InetSocketAddress) socketAddress);
+            buffer.append((address.getAddress() != null) ? address.getAddress().getHostAddress() : address.getAddress()).append(':').append(address.getPort());
+        } else {
+            buffer.append(socketAddress);
+        }
+    }
+
+    private static void formatOps(final StringBuilder buffer, final int ops) {
+        if ((ops & SelectionKey.OP_READ) > 0) {
+            buffer.append('r');
+        }
+        if ((ops & SelectionKey.OP_WRITE) > 0) {
+            buffer.append('w');
+        }
+        if ((ops & SelectionKey.OP_ACCEPT) > 0) {
+            buffer.append('a');
+        }
+        if ((ops & SelectionKey.OP_CONNECT) > 0) {
+            buffer.append('c');
+        }
+    }
+
     @Override
     public ByteChannel channel() {
         return channel;
@@ -157,29 +181,5 @@ public class DefaultSessionContext implements SessionContext {
         buffer.append("]");
 
         return buffer.toString();
-    }
-
-    private void formatAddress(final StringBuilder buffer, final SocketAddress socketAddress) {
-        if (socketAddress instanceof InetSocketAddress) {
-            final InetSocketAddress address = ((InetSocketAddress) socketAddress);
-            buffer.append((address.getAddress() != null) ? address.getAddress().getHostAddress() : address.getAddress()).append(':').append(address.getPort());
-        } else {
-            buffer.append(socketAddress);
-        }
-    }
-
-    private void formatOps(final StringBuilder buffer, final int ops) {
-        if ((ops & SelectionKey.OP_READ) > 0) {
-            buffer.append('r');
-        }
-        if ((ops & SelectionKey.OP_WRITE) > 0) {
-            buffer.append('w');
-        }
-        if ((ops & SelectionKey.OP_ACCEPT) > 0) {
-            buffer.append('a');
-        }
-        if ((ops & SelectionKey.OP_CONNECT) > 0) {
-            buffer.append('c');
-        }
     }
 }

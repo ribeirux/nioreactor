@@ -5,7 +5,7 @@ import java.nio.channels.ByteChannel;
 
 /**
  * Session context that shared across the request lifecycle.
- *
+ * <p/>
  * Created by ribeirux on 26/07/14.
  */
 public interface SessionContext {

@@ -4,12 +4,16 @@ import org.nioreactor.util.Preconditions;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.nio.channels.SocketChannel;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
@@ -17,26 +21,30 @@ import java.util.logging.Logger;
 
 /**
  * I/O reactor that is capable of listening incoming connections and forward to workers.
- *
+ * <p/>
  * Created by ribeirux on 26/07/14.
  */
-public class ListeningReactor {
+// TODO test shutdown without start
+public class ListeningReactor extends Thread {
 
     private static final Logger LOGGER = Logger.getLogger(ListeningReactor.class.getName());
+
+    private static final AtomicLong COUNTER = new AtomicLong(0);
 
     private final ReentrantLock mainLock = new ReentrantLock();
     private final Condition termination = mainLock.newCondition();
     private final ReactorConfig config;
-    private final List<DefaultDispatcher> dispatchers;
-    private final Acceptor acceptor;
+    private final Dispatcher dispatcher;
+    private final Selector selector;
     private final ServerSocketChannel serverChannel;
     private volatile ReactorStatus status = ReactorStatus.INACTIVE;
 
     public ListeningReactor(final ReactorConfig config) throws IOException {
+        super("I/O acceptor " + COUNTER.getAndIncrement());
         this.config = Preconditions.checkNotNull(config);
-        dispatchers = buildDefaultDispatchers(config);
-        acceptor = new Acceptor(config, new ChannelDispatcherPool(this.dispatchers));
-        serverChannel = buildServerChannel();
+        this.dispatcher = new MultiworkerDispatcher(config.workers(), config.eventListenerFactory());
+        this.selector = Selector.open();
+        this.serverChannel = buildServerChannel();
     }
 
     private static void closeServerSocketChannel(final ServerSocketChannel serverSocketChannel) {
@@ -49,25 +57,12 @@ public class ListeningReactor {
         }
     }
 
-    private static void shutdownDispatchers(final List<DefaultDispatcher> dispatchers) {
-        for (final DefaultDispatcher dispatcher : dispatchers) {
-            dispatcher.shutdown();
-        }
-    }
-
-    private List<DefaultDispatcher> buildDefaultDispatchers(final ReactorConfig config) throws IOException {
-        final List<DefaultDispatcher> dispatchersInit = new ArrayList<>(config.workers());
+    private static void closeSelector(final Selector selector) {
         try {
-            for (int i = 0; i < config.workers(); i++) {
-                dispatchersInit.add(new DefaultDispatcher(config.eventListenerFactory().create()));
-            }
-        } catch (final IOException e) {
-            shutdownDispatchers(dispatchersInit);
-
-            throw e;
+            selector.close();
+        } catch (final IOException ex) {
+            LOGGER.log(Level.WARNING, "Could not close selector", ex);
         }
-
-        return Collections.unmodifiableList(dispatchersInit);
     }
 
     private ServerSocketChannel buildServerChannel() throws IOException {
@@ -91,19 +86,12 @@ public class ListeningReactor {
         }
     }
 
-
-    public ReactorStatus getStatus() {
-        return this.status;
-    }
-
-    public void start() throws IOException {
-        LOGGER.info("Staring I/O reactor");
-
+    public void bind() throws IOException {
         // call start only once
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
-            if (status != ReactorStatus.INACTIVE) {
+            if (this.status != ReactorStatus.INACTIVE) {
                 throw new IllegalStateException("Start not allowed");
             }
 
@@ -112,17 +100,101 @@ public class ListeningReactor {
             mainLock.unlock();
         }
 
-        // start all workers
-        for (final DefaultDispatcher dispatcher : dispatchers) {
-            dispatcher.start();
+        this.dispatcher.start();
+        this.serverChannel.socket().bind(this.config.bindAddress(), this.config.backlogSize());
+        this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        this.start();
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (this.status == ReactorStatus.ACTIVE) {
+                final int readyCount = this.selector.select();
+                if (this.status == ReactorStatus.ACTIVE) {
+                    processEvents(readyCount);
+                }
+            }
+        } catch (final IOException e) {
+            LOGGER.log(Level.SEVERE, "Unrecoverable exception. Shutting down acceptor", e);
+        } finally {
+            doShutdown();
+        }
+    }
+
+    private void processEvents(final int readyCount) throws IOException {
+        if (readyCount > 0) {
+            final Set<SelectionKey> selectedKeys = this.selector.selectedKeys();
+            for (final SelectionKey key : selectedKeys) {
+                if (key.isValid()) {
+                    processEvent(key);
+                }
+            }
+
+            selectedKeys.clear();
+        }
+    }
+
+    private void processEvent(final SelectionKey key) throws IOException {
+        try {
+            if (key.isAcceptable()) {
+                final SocketChannel socketChannel = ((ServerSocketChannel) key.channel()).accept();
+                if (socketChannel != null) {
+                    prepareSocket(socketChannel.socket());
+                    dispatcher.dispatch(socketChannel);
+                }
+            }
+        } catch (final CancelledKeyException ex) {
+            LOGGER.log(Level.WARNING, "attempt is made to use a selection key that is no longer valid", ex);
+        }
+    }
+
+    private void prepareSocket(final Socket socket) throws IOException {
+        socket.setTcpNoDelay(this.config.tcpNoDelay());
+        socket.setKeepAlive(this.config.soKeepAlive());
+        if (this.config.soTimeout() > 0) {
+            socket.setSoTimeout(this.config.soTimeout());
+        }
+        if (this.config.sndBufSize() > 0) {
+            socket.setSendBufferSize(this.config.sndBufSize());
+        }
+        if (this.config.rcvBufSize() > 0) {
+            socket.setReceiveBufferSize(this.config.rcvBufSize());
+        }
+        final int linger = this.config.soLinger();
+        if (linger >= 0) {
+            socket.setSoLinger(true, linger);
+        }
+    }
+
+    public ReactorStatus getStatus() {
+        return this.status;
+    }
+
+    /**
+     * Attempts graceful shutdown of this I/O reactor.
+     */
+    public void shutdown() {
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            if (this.status.compareTo(ReactorStatus.ACTIVE) > 0) {
+                return;
+            }
+
+            // if inactive, just close the opened selector
+            if (this.status == ReactorStatus.INACTIVE) {
+                doShutdown();
+                this.status = ReactorStatus.SHUT_DOWN;
+                return;
+            }
+
+            this.status = ReactorStatus.SHUTTING_DOWN;
+        } finally {
+            mainLock.unlock();
         }
 
-        // bind
-        serverChannel.socket().bind(this.config.bindAddress(), this.config.backlogSize());
-        serverChannel.register(acceptor.selector(), SelectionKey.OP_ACCEPT);
-
-        // start acceptor
-        acceptor.start();
+        this.selector.wakeup();
     }
 
     public void await() throws InterruptedException {
@@ -158,19 +230,20 @@ public class ListeningReactor {
         }
     }
 
-    public void shutdown() {
+    private void doShutdown() {
         LOGGER.info("Shutting down I/O reactor");
 
         closeServerSocketChannel(this.serverChannel);
 
-        // Close out all channels
-        acceptor.shutdown();
+        closeSelector();
 
-        // Attempt to shut down I/O dispatchers gracefully
-        shutdownDispatchers(this.dispatchers);
+        this.dispatcher.shutdown();
 
-        // Join worker threads
-        joinThreads();
+        try {
+            this.dispatcher.await();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         // finally, change the state to SHUT_DOWN
         final ReentrantLock mainLock = this.mainLock;
@@ -183,19 +256,21 @@ public class ListeningReactor {
         }
     }
 
-    private void joinThreads() {
-        try {
-            acceptor.join();
-        } catch (final InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        for (final DefaultDispatcher dispatcher : dispatchers) {
-            try {
-                dispatcher.join();
-            } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
+    private void closeSelector() {
+        if (this.selector.isOpen()) {
+            for (final SelectionKey key : this.selector.keys()) {
+                try {
+                    final Channel channel = key.channel();
+                    if (channel != null) {
+                        channel.close();
+                    }
+                } catch (final IOException ex) {
+                    LOGGER.log(Level.WARNING, "Could not close channel", ex);
+                }
             }
+
+            // Stop dispatching I/O events
+            closeSelector(this.selector);
         }
     }
 }
