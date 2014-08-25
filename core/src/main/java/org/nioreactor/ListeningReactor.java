@@ -21,6 +21,7 @@ import org.nioreactor.util.Preconditions;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
@@ -28,12 +29,17 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static org.nioreactor.SocketOption.SO_KEEPALIVE;
+import static org.nioreactor.SocketOption.SO_LINGER;
+import static org.nioreactor.SocketOption.SO_RCVBUF;
+import static org.nioreactor.SocketOption.SO_REUSEADDR;
+import static org.nioreactor.SocketOption.SO_SNDBUF;
+import static org.nioreactor.SocketOption.SO_TIMEOUT;
+import static org.nioreactor.SocketOption.TCP_NODELAY;
 
 /**
  * I/O reactor that is capable of listening incoming connections and forward to workers.
@@ -41,24 +47,25 @@ import java.util.logging.Logger;
  * Created by ribeirux on 26/07/14.
  */
 // TODO test shutdown without start
-public class ListeningReactor extends Thread {
+public class ListeningReactor implements Runnable {
 
     private static final Logger LOGGER = Logger.getLogger(ListeningReactor.class.getName());
 
-    private static final AtomicLong COUNTER = new AtomicLong(0);
-
     private final ReentrantLock mainLock = new ReentrantLock();
-    private final Condition termination = mainLock.newCondition();
-    private final ReactorConfig config;
+    private final SocketConfig config;
     private final Dispatcher dispatcher;
+    private final SocketAddress socketAddress;
+    private final int backlog;
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
     private volatile ReactorStatus status = ReactorStatus.INACTIVE;
 
-    public ListeningReactor(final ReactorConfig config) throws IOException {
-        super("I/O acceptor " + COUNTER.getAndIncrement());
+    public ListeningReactor(final SocketConfig config, final Dispatcher dispatcher,
+                            final SocketAddress socketAddress, final int backlog) throws IOException {
         this.config = Preconditions.checkNotNull(config);
-        this.dispatcher = new MultiworkerDispatcher(config.workers(), config.eventListenerFactory());
+        this.dispatcher = Preconditions.checkNotNull(dispatcher, "dispatcher is null");
+        this.socketAddress = socketAddress;
+        this.backlog = backlog;
         this.selector = Selector.open();
         this.serverChannel = buildServerChannel();
     }
@@ -85,13 +92,18 @@ public class ListeningReactor extends Thread {
         final ServerSocketChannel serverChannel = ServerSocketChannel.open();
         try {
             final ServerSocket socket = serverChannel.socket();
-            socket.setReuseAddress(this.config.soReuseAddress());
-            if (this.config.soTimeout() > 0) {
-                socket.setSoTimeout(this.config.soTimeout());
+            socket.setReuseAddress(this.config.option(SO_REUSEADDR));
+
+            final int timeout = this.config.option(SO_TIMEOUT);
+            if (timeout > 0) {
+                socket.setSoTimeout(timeout);
             }
-            if (this.config.rcvBufSize() > 0) {
-                socket.setReceiveBufferSize(this.config.rcvBufSize());
+
+            final int rcvBuf = this.config.option(SO_RCVBUF);
+            if (rcvBuf > 0) {
+                socket.setReceiveBufferSize(rcvBuf);
             }
+
             serverChannel.configureBlocking(false);
 
             return serverChannel;
@@ -102,36 +114,15 @@ public class ListeningReactor extends Thread {
         }
     }
 
-    public void bind() throws IOException {
-        // call start only once
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
-        try {
-            if (this.status != ReactorStatus.INACTIVE) {
-                throw new IllegalStateException("Start not allowed");
-            }
-
-            status = ReactorStatus.ACTIVE;
-        } finally {
-            mainLock.unlock();
-        }
-
-        try {
-            this.serverChannel.socket().bind(this.config.bindAddress(), this.config.backlogSize());
-            this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-        } catch (final IOException e) {
-            // set the status to inactive and let the client decide what to do
-            status = ReactorStatus.INACTIVE;
-            throw e;
-        }
-
-        this.dispatcher.start();
-        this.start();
-    }
-
     @Override
     public void run() {
+        this.status = ReactorStatus.ACTIVE;
+
         try {
+            this.serverChannel.socket().bind(socketAddress, backlog);
+            this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+            this.dispatcher.start();
+
             while (this.status == ReactorStatus.ACTIVE) {
                 final int readyCount = this.selector.select();
                 if (this.status == ReactorStatus.ACTIVE) {
@@ -168,23 +159,30 @@ public class ListeningReactor extends Thread {
                 }
             }
         } catch (final CancelledKeyException ex) {
-            LOGGER.log(Level.WARNING, "attempt is made to use a selection key that is no longer valid", ex);
+            LOGGER.log(Level.WARNING, "selection key that is no longer valid", ex);
         }
     }
 
     private void prepareSocket(final Socket socket) throws IOException {
-        socket.setTcpNoDelay(this.config.tcpNoDelay());
-        socket.setKeepAlive(this.config.soKeepAlive());
-        if (this.config.soTimeout() > 0) {
-            socket.setSoTimeout(this.config.soTimeout());
+        socket.setTcpNoDelay(this.config.option(TCP_NODELAY));
+        socket.setKeepAlive(this.config.option(SO_KEEPALIVE));
+
+        final int timeout = this.config.option(SO_TIMEOUT);
+        if (timeout > 0) {
+            socket.setSoTimeout(timeout);
         }
-        if (this.config.sndBufSize() > 0) {
-            socket.setSendBufferSize(this.config.sndBufSize());
+
+        final int sndBuf = this.config.option(SO_SNDBUF);
+        if (sndBuf > 0) {
+            socket.setSendBufferSize(sndBuf);
         }
-        if (this.config.rcvBufSize() > 0) {
-            socket.setReceiveBufferSize(this.config.rcvBufSize());
+
+        final int rcvBuf = this.config.option(SO_RCVBUF);
+        if (rcvBuf > 0) {
+            socket.setReceiveBufferSize(rcvBuf);
         }
-        final int linger = this.config.soLinger();
+
+        final int linger = this.config.option(SO_LINGER);
         if (linger >= 0) {
             socket.setSoLinger(true, linger);
         }
@@ -220,39 +218,6 @@ public class ListeningReactor extends Thread {
         this.selector.wakeup();
     }
 
-    public void await() throws InterruptedException {
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
-        try {
-            while (this.status != ReactorStatus.SHUT_DOWN) {
-                termination.await();
-            }
-        } finally {
-            mainLock.unlock();
-        }
-    }
-
-    public boolean awaitTermination(final long timeout, final TimeUnit unit) throws InterruptedException {
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
-        try {
-            for (; ; ) {
-                if (this.status == ReactorStatus.SHUT_DOWN) {
-                    return true;
-                }
-
-                if (nanos <= 0) {
-                    return false;
-                }
-
-                nanos = termination.awaitNanos(nanos);
-            }
-        } finally {
-            mainLock.unlock();
-        }
-    }
-
     private void doShutdown() {
         LOGGER.info("Shutting down I/O reactor");
 
@@ -269,14 +234,7 @@ public class ListeningReactor extends Thread {
         }
 
         // finally, change the state to SHUT_DOWN
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
-        try {
-            this.status = ReactorStatus.SHUT_DOWN;
-            this.termination.signalAll();
-        } finally {
-            mainLock.unlock();
-        }
+        this.status = ReactorStatus.SHUT_DOWN;
     }
 
     private void closeSelector() {

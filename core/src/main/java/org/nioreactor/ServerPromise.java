@@ -16,20 +16,20 @@
 
 package org.nioreactor;
 
-import java.nio.channels.SocketChannel;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Socket channel dispatcher. Mainly used to forward accepted requests.
- * <p/>
- * Created by ribeirux on 8/10/14.
+ * The result of server bind operation.
+ *
+ * Created by ribeirux on 8/17/14.
  */
-public interface Dispatcher {
+public interface ServerPromise {
 
-    void start();
-
-    void dispatch(SocketChannel socketChannel);
+    ReactorStatus getStatus();
 
     void shutdown();
 
     void await() throws InterruptedException;
+
+    void await(long timeout, TimeUnit unit) throws InterruptedException;
 }

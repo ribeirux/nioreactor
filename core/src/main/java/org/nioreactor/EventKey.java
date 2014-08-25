@@ -19,7 +19,7 @@ package org.nioreactor;
 import java.nio.channels.SelectionKey;
 
 /**
- * * Type of I/O event notifications.
+ * Type of I/O event notifications.
  * <p/>
  * Created by ribeirux on 8/11/14.
  */

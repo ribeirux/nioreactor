@@ -23,6 +23,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -33,47 +34,47 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MultiworkerDispatcher implements Dispatcher {
 
     private final AtomicInteger counter = new AtomicInteger(0);
-    private final List<Dispatcher> dispatchers;
+    private final List<DefaultWorker> dispatchers;
+    private final List<Thread> threads;
 
-    public MultiworkerDispatcher(final int workers, final EventListenerFactory factory) throws IOException {
+    public MultiworkerDispatcher(final int workers, final EventListenerFactory factory, final ThreadFactory threadFactory) throws IOException {
         Preconditions.checkArgument(workers > 0, "number of workers should be higher than 0");
         Preconditions.checkNotNull(factory, "factory is null");
-        this.dispatchers = buildDefaultDispatchers(workers, factory);
-    }
 
-    private static void shutdownDispatchers(final List<Dispatcher> dispatchers) {
-        for (final Dispatcher dispatcher : dispatchers) {
-            dispatcher.shutdown();
-        }
-    }
-
-    private static List<Dispatcher> buildDefaultDispatchers(final int workers, final EventListenerFactory factory) throws IOException {
-        final List<Dispatcher> dispatchersInit = new ArrayList<>(workers);
+        final List<DefaultWorker> dispatchersInit = new ArrayList<>(workers);
+        final List<Thread> threadsInit = new ArrayList<>(workers);
         try {
             for (int i = 0; i < workers; i++) {
-                dispatchersInit.add(new DefaultDispatcher(factory.create()));
+                final DefaultWorker newDispatcher = new DefaultWorker(factory.create());
+                dispatchersInit.add(newDispatcher);
+                threadsInit.add(threadFactory.newThread(newDispatcher));
             }
         } catch (final IOException e) {
             shutdownDispatchers(dispatchersInit);
-
             throw e;
         }
 
-        return Collections.unmodifiableList(dispatchersInit);
+        this.dispatchers = Collections.unmodifiableList(dispatchersInit);
+        this.threads = Collections.unmodifiableList(threadsInit);
+    }
+
+    private static void shutdownDispatchers(final List<DefaultWorker> dispatchers) {
+        for (final DefaultWorker dispatcher : dispatchers) {
+            dispatcher.shutdown();
+        }
     }
 
     @Override
     public void start() {
         // start all workers
-        for (final Dispatcher dispatcher : dispatchers) {
-            dispatcher.start();
+        for (final Thread t : threads) {
+            t.start();
         }
     }
 
     @Override
     public void dispatch(final SocketChannel socketChannel) {
-        this.dispatchers.get((this.counter.getAndIncrement() & 0x7fffffff)
-                % dispatchers.size()).dispatch(socketChannel);
+        this.dispatchers.get((this.counter.getAndIncrement() & 0x7fffffff) % dispatchers.size()).dispatch(socketChannel);
     }
 
     @Override
@@ -83,8 +84,8 @@ public class MultiworkerDispatcher implements Dispatcher {
 
     @Override
     public void await() throws InterruptedException {
-        for (final Dispatcher dispatcher : dispatchers) {
-            dispatcher.await();
+        for (final Thread t : threads) {
+            t.join();
         }
     }
 }

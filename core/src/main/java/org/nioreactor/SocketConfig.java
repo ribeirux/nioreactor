@@ -16,20 +16,11 @@
 
 package org.nioreactor;
 
-import java.nio.channels.SocketChannel;
-
 /**
- * Socket channel dispatcher. Mainly used to forward accepted requests.
- * <p/>
- * Created by ribeirux on 8/10/14.
+ * Socket configuration provider.
+ * Created by ribeirux on 8/23/14.
  */
-public interface Dispatcher {
+public interface SocketConfig {
 
-    void start();
-
-    void dispatch(SocketChannel socketChannel);
-
-    void shutdown();
-
-    void await() throws InterruptedException;
+    <T> T option(SocketOption<T> option);
 }

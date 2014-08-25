@@ -27,38 +27,21 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p/>
  * Created by ribeirux on 8/16/14.
  */
-public final class AttributeKey<T> {
+public final class AttributeKey<T> extends AbstractOption<T> {
 
     // Avoid Thread hostility
     private static final Set<String> NAMES = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
-    private final String name;
+    public AttributeKey(final String name, final Class<T> type) {
+        super(validateNameUniqueness(name), type);
+    }
 
-    public AttributeKey(final String name) {
-        Preconditions.checkNotNull(name, "name is null");
+    private static String validateNameUniqueness(final String name) {
+        Preconditions.checkNotNull(name, "name");
         if (!NAMES.add(name)) {
-            throw new IllegalArgumentException(String.format("Key %s already exists", name));
+            throw new IllegalArgumentException("name: " + name + " already exists");
         }
 
-        this.name = name;
-    }
-
-    public final String name() {
         return name;
-    }
-
-    @Override
-    public final int hashCode() {
-        return super.hashCode();
-    }
-
-    @Override
-    public final boolean equals(final Object obj) {
-        return super.equals(obj);
-    }
-
-    @Override
-    public final String toString() {
-        return name();
     }
 }

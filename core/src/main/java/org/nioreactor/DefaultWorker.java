@@ -29,20 +29,18 @@ import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * This class adds support for the I/O event dispatching
+ * Worker used to handle accepted connections.
+ * <p/>
  * Created by ribeirux on 26/07/14.
  */
-public class DefaultDispatcher extends Thread implements Dispatcher {
+public class DefaultWorker implements Runnable {
 
-    private static final Logger LOGGER = Logger.getLogger(DefaultDispatcher.class.getName());
-
-    private static final AtomicLong COUNTER = new AtomicLong(0);
+    private static final Logger LOGGER = Logger.getLogger(DefaultWorker.class.getName());
 
     private final ReentrantLock mainLock = new ReentrantLock();
     private final EventListener listener;
@@ -52,8 +50,7 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
     private final Queue<SessionContext> closedSessions;
     private volatile ReactorStatus status = ReactorStatus.INACTIVE;
 
-    public DefaultDispatcher(final EventListener listener) throws IOException {
-        super("I/O dispatcher " + COUNTER.getAndIncrement());
+    public DefaultWorker(final EventListener listener) throws IOException {
         this.listener = Preconditions.checkNotNull(listener, "listener is null");
         this.selector = Selector.open();
         this.sessions = new HashSet<>();
@@ -101,16 +98,12 @@ public class DefaultDispatcher extends Thread implements Dispatcher {
                 }
             }
         } catch (final ClosedSelectorException ignore) {
+            // ignored
         } catch (final IOException e) {
             LOGGER.log(Level.SEVERE, "Unrecoverable exception. Shutting down dispatcher", e);
         } finally {
             doShutdown();
         }
-    }
-
-    @Override
-    public void await() throws InterruptedException {
-        join();
     }
 
     /**

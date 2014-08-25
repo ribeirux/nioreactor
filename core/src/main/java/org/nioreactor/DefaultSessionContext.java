@@ -43,11 +43,11 @@ public class DefaultSessionContext implements SessionContext {
     private final SelectionKey key;
     private final ByteChannel channel;
     private final Map<AttributeKey<?>, Object> attributes;
-    private final DefaultDispatcher dispatcher;
+    private final DefaultWorker dispatcher;
     private volatile SessionStatus status = SessionStatus.ACTIVE;
     private volatile int socketTimeout = 0;
 
-    public DefaultSessionContext(final SelectionKey key, final DefaultDispatcher dispatcher) {
+    public DefaultSessionContext(final SelectionKey key, final DefaultWorker dispatcher) {
         this.key = Preconditions.checkNotNull(key, "key is null");
         this.channel = (ByteChannel) this.key.channel();
         this.dispatcher = Preconditions.checkNotNull(dispatcher, "dispatcher is null");
@@ -153,21 +153,21 @@ public class DefaultSessionContext implements SessionContext {
     }
 
     @Override
-    @SuppressWarnings("unckecked")
     public <T> T putAttribute(final AttributeKey<T> key, final T value) {
-        return (T) this.attributes.put(key, value);
+        Preconditions.checkNotNull(key, "key is null");
+        Preconditions.checkNotNull(value, "value is null");
+        return key.cast(this.attributes.put(key, value));
     }
 
     @Override
-    @SuppressWarnings("unckecked")
     public <T> T getAttribute(final AttributeKey<T> key) {
-        return (T) this.attributes.get(key);
+        Preconditions.checkNotNull(key, "key is null");
+        return key.cast(this.attributes.get(key));
     }
 
     @Override
-    @SuppressWarnings("unckecked")
     public <T> T removeAttribute(final AttributeKey<T> key) {
-        return (T) this.attributes.remove(key);
+        return key.cast(this.attributes.remove(key));
     }
 
     @Override

@@ -16,20 +16,20 @@
 
 package org.nioreactor;
 
-import java.nio.channels.SocketChannel;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Socket channel dispatcher. Mainly used to forward accepted requests.
+ * Default acceptor thread factory.
  * <p/>
- * Created by ribeirux on 8/10/14.
+ * Created by ribeirux on 8/17/14.
  */
-public interface Dispatcher {
+public class DefaultAcceptorThreadFactory implements ThreadFactory {
 
-    void start();
+    private static final AtomicLong COUNTER = new AtomicLong(0);
 
-    void dispatch(SocketChannel socketChannel);
-
-    void shutdown();
-
-    void await() throws InterruptedException;
+    @Override
+    public Thread newThread(final Runnable r) {
+        return new Thread(r, "I/O acceptor " + COUNTER.getAndIncrement());
+    }
 }
