@@ -23,6 +23,7 @@ import org.nioreactor.EventListenerFactory;
 import org.nioreactor.ServerBuilder;
 import org.nioreactor.ServerPromise;
 import org.nioreactor.SessionContext;
+import org.nioreactor.SocketOption;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,12 +42,9 @@ public final class EchoServer {
 
     public static void main(final String[] args) {
         try {
-            final ServerPromise server = ServerBuilder.newBuilder(new EventListenerFactory() {
-                @Override
-                public EventListener create() {
-                    return new EchoEventListener();
-                }
-            }).workers(5).bind(8080);
+            final ServerPromise server = ServerBuilder.newBuilder(EchoEventListener.FACTORY)
+                    .workers(6)
+                    .bind(8080);
 
             // add shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -70,11 +68,21 @@ public final class EchoServer {
         }
     }
 
-    private static class EchoEventListener implements EventListener {
+    private static final class EchoEventListener implements EventListener {
+
+        private final static Logger LOGGER = Logger.getLogger(EchoEventListener.class.getName());
+
+        private static final AttributeKey<ByteBuffer> BUFFER = new AttributeKey<>("BUFFER", ByteBuffer.class);
 
         public static final int BUFFER_SIZE = 1024;
-        private final static Logger LOGGER = Logger.getLogger(EchoEventListener.class.getName());
-        private static final AttributeKey<ByteBuffer> BUFFER = new AttributeKey<>("BUFFER", ByteBuffer.class);
+
+        public static final EventListenerFactory FACTORY = new EventListenerFactory() {
+            @Override
+            public EventListener create() {
+                // a new listener per worker
+                return new EchoEventListener();
+            }
+        };
 
         public void connected(final SessionContext session) {
             LOGGER.fine("connected:" + session.remoteAddress());
@@ -89,17 +97,16 @@ public final class EchoServer {
 
             final ByteBuffer buffer = session.getAttribute(BUFFER);
             try {
-                buffer.compact();
                 final int count = session.channel().read(buffer);
                 if (count < 0) {
                     session.close();
                 } else {
                     if (buffer.position() > 0) {
-                        session.interestEvent(buffer.limit() == buffer.capacity() ?
-                                // buffer is full. Set it to write mode
-                                EventKey.WRITE :
+                        session.interestEvent(buffer.hasRemaining() ?
                                 // we have info in buffer and it's not full
-                                EventKey.READ_WRITE);
+                                EventKey.READ_WRITE :
+                                // buffer is full. Set it to write only mode
+                                EventKey.WRITE);
                     }
                 }
             } catch (final IOException e) {
@@ -119,6 +126,7 @@ public final class EchoServer {
                     // nothing to write, set to read mode
                     session.interestEvent(EventKey.READ);
                 }
+                buffer.compact();
             } catch (final IOException ex) {
                 LOGGER.log(Level.SEVERE, "I/O error: ", ex);
                 session.close();
