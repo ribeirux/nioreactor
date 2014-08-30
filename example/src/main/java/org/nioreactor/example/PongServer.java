@@ -27,11 +27,12 @@ import org.nioreactor.SessionContext;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Time Server example.
+ * Pong Server example.
  * <p/>
  * Created by ribeirux on 02/08/14.
  */
@@ -47,7 +48,21 @@ public final class PongServer {
                     return new PongEventListener();
                 }
             }).workers(5).bind(8080);
-            LOGGER.info("Server started. Press any key to shutdown the server");
+
+            // add shutdown hook
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    server.shutdown();
+                    try {
+                        server.await(10, TimeUnit.SECONDS);
+                    } catch (final InterruptedException e) {
+                        // We're shutting down, so just ignore.
+                    }
+                }
+            });
+
+            LOGGER.info("Server started");
             server.await();
         } catch (final IOException e) {
             LOGGER.log(Level.SEVERE, "I/O error: ", e);

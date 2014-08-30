@@ -31,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Time Server example.
+ * Echo Server example.
  * <p/>
  * Created by ribeirux on 02/08/14.
  */
@@ -44,7 +44,7 @@ public final class EchoServer {
             final ServerPromise server = ServerBuilder.newBuilder(new EventListenerFactory() {
                 @Override
                 public EventListener create() {
-                    return new PongEventListener();
+                    return new EchoEventListener();
                 }
             }).workers(5).bind(8080);
 
@@ -70,10 +70,10 @@ public final class EchoServer {
         }
     }
 
-    private static class PongEventListener implements EventListener {
+    private static class EchoEventListener implements EventListener {
 
         public static final int BUFFER_SIZE = 1024;
-        private final static Logger LOGGER = Logger.getLogger(PongEventListener.class.getName());
+        private final static Logger LOGGER = Logger.getLogger(EchoEventListener.class.getName());
         private static final AttributeKey<ByteBuffer> BUFFER = new AttributeKey<>("BUFFER", ByteBuffer.class);
 
         public void connected(final SessionContext session) {
