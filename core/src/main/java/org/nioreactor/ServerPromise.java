@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The result of server bind operation.
- *
+ * <p>
  * Created by ribeirux on 8/17/14.
  */
 public interface ServerPromise {

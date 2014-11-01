@@ -58,18 +58,14 @@ public class MultiworkerDispatcher implements Dispatcher {
         this.threads = Collections.unmodifiableList(threadsInit);
     }
 
-    private static void shutdownDispatchers(final List<DefaultWorker> dispatchers) {
-        for (final DefaultWorker dispatcher : dispatchers) {
-            dispatcher.shutdown();
-        }
+    private static void shutdownDispatchers(final Iterable<DefaultWorker> dispatchers) {
+        dispatchers.forEach(DefaultWorker::shutdown);
     }
 
     @Override
     public void start() {
         // start all workers
-        for (final Thread t : threads) {
-            t.start();
-        }
+        threads.forEach(Thread::start);
     }
 
     @Override

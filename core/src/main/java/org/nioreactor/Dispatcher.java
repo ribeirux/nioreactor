@@ -20,7 +20,7 @@ import java.nio.channels.SocketChannel;
 
 /**
  * Socket channel dispatcher. Mainly used to forward accepted requests.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/10/14.
  */
 public interface Dispatcher {

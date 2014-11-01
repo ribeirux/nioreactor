@@ -20,7 +20,7 @@ import org.nioreactor.util.Preconditions;
 
 /**
  * Option for configuring the socket.
- *
+ * <p>
  * Created by ribeirux on 8/17/14.
  */
 public final class SocketOption<T> extends AbstractOption<T> {

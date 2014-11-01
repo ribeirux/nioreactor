@@ -18,9 +18,10 @@ package org.nioreactor;
 
 /**
  * Creates a new {@link org.nioreactor.EventListener}.
- * <p/>
+ * <p>
  * Created by ribeirux on 26/07/14.
  */
+@FunctionalInterface
 public interface EventListenerFactory {
 
     /**

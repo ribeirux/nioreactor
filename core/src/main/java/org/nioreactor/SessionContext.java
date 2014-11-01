@@ -20,8 +20,8 @@ import java.net.SocketAddress;
 import java.nio.channels.ByteChannel;
 
 /**
- * Session context that shared across the request lifecycle.
- * <p/>
+ * Session context shared across the request lifecycle.
+ * <p>
  * Created by ribeirux on 26/07/14.
  */
 public interface SessionContext {
@@ -60,35 +60,12 @@ public interface SessionContext {
     void close();
 
     /**
-     * Gets the status of the session:
-     *
-     * @return session status.
-     */
-    SessionStatus getStatus();
-
-    /**
      * Checks if the session has been terminated.
      *
      * @return <code>true</code> if the session has been terminated,
      * <code>false</code> otherwise.
      */
     boolean isClosed();
-
-    /**
-     * Gets the socket timeout in milliseconds. The value of
-     * <code>0</code> signifies the session cannot time out.
-     *
-     * @return socket timeout.
-     */
-    int getSocketTimeout();
-
-    /**
-     * Sets value of the socket timeout in milliseconds. The value of
-     * <code>0</code> signifies the session cannot time out.
-     *
-     * @param timeout socket timeout.
-     */
-    void setSocketTimeout(int timeout);
 
     /**
      * This method can be used to associate a particular object with the
@@ -103,7 +80,7 @@ public interface SessionContext {
     /**
      * Returns the value of the attribute with the given key. The value can be
      * <code>null</code> if not set.
-     * <p/>
+     * <p>
      *
      * @param key key of the attribute.
      * @return value of the attribute.

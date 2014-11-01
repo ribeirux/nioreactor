@@ -16,20 +16,20 @@
 
 package org.nioreactor;
 
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
- * Session status.
- * <p/>
- * Created by ribeirux on 02/08/14.
+ * Default acceptor thread factory.
+ * <p>
+ * Created by ribeirux on 8/17/14.
  */
-public enum SessionStatus {
+public class AcceptorThreadFactory implements ThreadFactory {
 
-    /**
-     * The session is active.
-     */
-    ACTIVE,
+    private static final AtomicLong COUNTER = new AtomicLong(0);
 
-    /**
-     * The session is closed.
-     */
-    CLOSED
+    @Override
+    public Thread newThread(final Runnable r) {
+        return new Thread(r, "I/O acceptor " + COUNTER.getAndIncrement());
+    }
 }

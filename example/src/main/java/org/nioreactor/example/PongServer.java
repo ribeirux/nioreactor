@@ -19,7 +19,6 @@ package org.nioreactor.example;
 import org.nioreactor.AttributeKey;
 import org.nioreactor.EventKey;
 import org.nioreactor.EventListener;
-import org.nioreactor.EventListenerFactory;
 import org.nioreactor.ServerBuilder;
 import org.nioreactor.ServerPromise;
 import org.nioreactor.SessionContext;
@@ -38,16 +37,14 @@ import java.util.logging.Logger;
  */
 public final class PongServer {
 
-    private final static Logger LOGGER = Logger.getLogger(PongServer.class.getName());
+    private final static Logger LOG = Logger.getLogger(PongServer.class.getName());
+
+    private PongServer() {
+    }
 
     public static void main(final String[] args) {
         try {
-            final ServerPromise server = ServerBuilder.newBuilder(new EventListenerFactory() {
-                @Override
-                public EventListener create() {
-                    return new PongEventListener();
-                }
-            }).workers(5).bind(8080);
+            final ServerPromise server = ServerBuilder.builder(PongEventListener::new).bind(8080);
 
             // add shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -62,37 +59,39 @@ public final class PongServer {
                 }
             });
 
-            LOGGER.info("Server started");
+            LOG.info("Server started");
             server.await();
         } catch (final IOException e) {
-            LOGGER.log(Level.SEVERE, "I/O error: ", e);
+            LOG.log(Level.SEVERE, "I/O error: ", e);
         } catch (final InterruptedException e) {
-            LOGGER.log(Level.WARNING, "Shutdown interrupted: ", e);
+            LOG.log(Level.WARNING, "Shutdown interrupted: ", e);
         }
     }
 
     private static class PongEventListener implements EventListener {
 
-        private final static Logger LOGGER = Logger.getLogger(PongEventListener.class.getName());
+        private final static Logger LOG = Logger.getLogger(PongEventListener.class.getName());
 
         private static final AttributeKey<ByteBuffer> BUFFER = new AttributeKey<>("BUFFER", ByteBuffer.class);
 
         private final ByteBuffer buffer = ByteBuffer.wrap("Pong...".getBytes(StandardCharsets.UTF_8));
 
+        @Override
         public void connected(final SessionContext session) {
-            LOGGER.fine("connected:" + session.remoteAddress());
+            LOG.fine("connected:" + session.remoteAddress());
 
-            session.setSocketTimeout(2000);
             session.putAttribute(BUFFER, buffer.duplicate());
             session.interestEvent(EventKey.WRITE);
         }
 
+        @Override
         public void inputReady(final SessionContext session) {
-            LOGGER.fine("readable:" + session.remoteAddress());
+            LOG.fine("readable:" + session.remoteAddress());
         }
 
+        @Override
         public void outputReady(final SessionContext session) {
-            LOGGER.fine("writable:" + session.remoteAddress());
+            LOG.fine("writable:" + session.remoteAddress());
 
             final ByteBuffer sessionBuffer = session.getAttribute(BUFFER);
             try {
@@ -103,13 +102,14 @@ public final class PongServer {
                     session.close();
                 }
             } catch (final IOException ex) {
-                LOGGER.log(Level.SEVERE, "I/O error: ", ex);
+                LOG.log(Level.SEVERE, "I/O error: ", ex);
                 session.close();
             }
         }
 
+        @Override
         public void disconnected(final SessionContext session) {
-            LOGGER.fine("disconnected:" + session.remoteAddress());
+            LOG.fine("disconnected:" + session.remoteAddress());
         }
     }
 }

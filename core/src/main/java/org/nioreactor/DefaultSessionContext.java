@@ -32,50 +32,24 @@ import java.util.logging.Logger;
 
 /**
  * Default implementation of {@link org.nioreactor.SessionContext}.
- * <p/>
+ * <p>
  * Created by ribeirux on 02/08/14.
  */
-public class DefaultSessionContext implements SessionContext {
+final class DefaultSessionContext implements SessionContext {
 
-    private static final Logger LOGGER = Logger.getLogger(DefaultSessionContext.class.getName());
+    private static final Logger LOG = Logger.getLogger(DefaultSessionContext.class.getName());
 
     private final ReentrantLock mainLock = new ReentrantLock();
+    private final Map<AttributeKey<?>, Object> attributes = new ConcurrentHashMap<>();
     private final SelectionKey key;
-    private final ByteChannel channel;
-    private final Map<AttributeKey<?>, Object> attributes;
+    private final SocketChannel channel;
     private final DefaultWorker dispatcher;
-    private volatile SessionStatus status = SessionStatus.ACTIVE;
-    private volatile int socketTimeout = 0;
+    private volatile boolean closed = false;
 
-    public DefaultSessionContext(final SelectionKey key, final DefaultWorker dispatcher) {
+    DefaultSessionContext(final SelectionKey key, final DefaultWorker dispatcher) {
         this.key = Preconditions.checkNotNull(key, "key is null");
-        this.channel = (ByteChannel) this.key.channel();
+        this.channel = (SocketChannel) this.key.channel();
         this.dispatcher = Preconditions.checkNotNull(dispatcher, "dispatcher is null");
-        this.attributes = new ConcurrentHashMap<>();
-    }
-
-    private static void formatAddress(final StringBuilder buffer, final SocketAddress socketAddress) {
-        if (socketAddress instanceof InetSocketAddress) {
-            final InetSocketAddress address = ((InetSocketAddress) socketAddress);
-            buffer.append((address.getAddress() != null) ? address.getAddress().getHostAddress() : address.getAddress()).append(':').append(address.getPort());
-        } else {
-            buffer.append(socketAddress);
-        }
-    }
-
-    private static void formatOps(final StringBuilder buffer, final int ops) {
-        if ((ops & SelectionKey.OP_READ) > 0) {
-            buffer.append('r');
-        }
-        if ((ops & SelectionKey.OP_WRITE) > 0) {
-            buffer.append('w');
-        }
-        if ((ops & SelectionKey.OP_ACCEPT) > 0) {
-            buffer.append('a');
-        }
-        if ((ops & SelectionKey.OP_CONNECT) > 0) {
-            buffer.append('c');
-        }
     }
 
     @Override
@@ -85,71 +59,55 @@ public class DefaultSessionContext implements SessionContext {
 
     @Override
     public SocketAddress remoteAddress() {
-        return this.channel instanceof SocketChannel ? ((SocketChannel) this.channel).socket().getRemoteSocketAddress() : null;
+        return this.channel.socket().getRemoteSocketAddress();
     }
 
     @Override
     public SocketAddress localAddress() {
-        return this.channel instanceof SocketChannel ? ((SocketChannel) this.channel).socket().getLocalSocketAddress() : null;
+        return this.channel.socket().getLocalSocketAddress();
     }
 
     @Override
     public void interestEvent(final EventKey op) {
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock lock = this.mainLock;
+        lock.lock();
         try {
-            if (this.status != SessionStatus.CLOSED) {
+            if (!this.closed) {
                 this.key.interestOps(op.interestOps());
-                this.key.selector().wakeup();
             }
         } finally {
-            mainLock.unlock();
+            lock.unlock();
         }
     }
 
     @Override
     public void close() {
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock lock = this.mainLock;
+        lock.lock();
         try {
-            if (this.status != SessionStatus.CLOSED) {
-                this.status = SessionStatus.CLOSED;
+            if (!this.closed) {
+                this.closed = true;
                 this.key.cancel();
 
                 try {
                     this.key.channel().close();
                 } catch (final IOException ex) {
-                    LOGGER.log(Level.WARNING, "Could not close channel", ex);
+                    LOG.log(Level.WARNING, "Could not close channel", ex);
                 }
 
-                this.dispatcher.closeSession(this);
+                this.dispatcher.queueClosedSession(this);
                 if (this.key.selector().isOpen()) {
                     this.key.selector().wakeup();
                 }
             }
         } finally {
-            mainLock.unlock();
+            lock.unlock();
         }
     }
 
     @Override
-    public SessionStatus getStatus() {
-        return this.status;
-    }
-
-    @Override
     public boolean isClosed() {
-        return this.status == SessionStatus.CLOSED;
-    }
-
-    @Override
-    public int getSocketTimeout() {
-        return this.socketTimeout;
-    }
-
-    @Override
-    public void setSocketTimeout(final int timeout) {
-        this.socketTimeout = timeout;
+        return this.closed;
     }
 
     @Override
@@ -167,6 +125,7 @@ public class DefaultSessionContext implements SessionContext {
 
     @Override
     public <T> T removeAttribute(final AttributeKey<T> key) {
+        Preconditions.checkNotNull(key, "key is null");
         return key.cast(this.attributes.remove(key));
     }
 
@@ -181,24 +140,33 @@ public class DefaultSessionContext implements SessionContext {
             buffer.append("<->");
             formatAddress(buffer, remoteAddress);
         }
-        buffer.append("[");
+        buffer.append('[');
 
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock lock = this.mainLock;
+        lock.lock();
         try {
-            buffer.append(status);
+            buffer.append(closed ? "CLOSED" : "ACTIVE");
             buffer.append("][");
             if (this.key.isValid()) {
-                formatOps(buffer, this.key.interestOps());
-                buffer.append(":");
-                formatOps(buffer, this.key.readyOps());
+                buffer.append(EventKey.formatOps(this.key.interestOps()));
+                buffer.append(':');
+                buffer.append(EventKey.formatOps(this.key.readyOps()));
             }
         } finally {
-            mainLock.unlock();
+            lock.unlock();
         }
 
-        buffer.append("]");
+        buffer.append(']');
 
         return buffer.toString();
+    }
+
+    private void formatAddress(final StringBuilder buffer, final SocketAddress socketAddress) {
+        if (socketAddress instanceof InetSocketAddress) {
+            final InetSocketAddress address = ((InetSocketAddress) socketAddress);
+            buffer.append((address.getAddress() != null) ? address.getAddress().getHostAddress() : address.getAddress()).append(':').append(address.getPort());
+        } else {
+            buffer.append(socketAddress);
+        }
     }
 }

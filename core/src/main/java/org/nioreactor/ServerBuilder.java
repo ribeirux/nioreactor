@@ -25,7 +25,7 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * Server builder.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/17/14.
  */
 public class ServerBuilder {
@@ -37,15 +37,15 @@ public class ServerBuilder {
 
     // optional
     private final DefaultSocketConfig.Builder socketConfigBuilder = DefaultSocketConfig.builder();
-    private ThreadFactory acceptorThreadFactory = new DefaultAcceptorThreadFactory();
-    private ThreadFactory dispatcherThreadFactory = new DefaultDispatcherThreadFactory();
+    private ThreadFactory acceptorThreadFactory = new AcceptorThreadFactory();
+    private ThreadFactory dispatcherThreadFactory = new DispatcherThreadFactory();
     private int workers = Runtime.getRuntime().availableProcessors();
 
     protected ServerBuilder(final EventListenerFactory factory) {
         this.eventListenerFactory = Preconditions.checkNotNull(factory, "eventListenerFactory is null");
     }
 
-    public static ServerBuilder newBuilder(final EventListenerFactory factory) {
+    public static ServerBuilder builder(final EventListenerFactory factory) {
         return new ServerBuilder(factory);
     }
 
@@ -74,10 +74,6 @@ public class ServerBuilder {
         return bind(new InetSocketAddress(port));
     }
 
-    public ServerPromise bind(final String host, final int port) throws IOException {
-        return bind(new InetSocketAddress(host, port));
-    }
-
     public ServerPromise bind(final SocketAddress address) throws IOException {
         return bind(address, DEFAULT_BACKLOG);
     }
@@ -94,4 +90,9 @@ public class ServerBuilder {
             throw e;
         }
     }
+
+    public ServerPromise bind(final String host, final int port) throws IOException {
+        return bind(new InetSocketAddress(host, port));
+    }
+
 }

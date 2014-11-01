@@ -20,7 +20,7 @@ import java.nio.channels.SelectionKey;
 
 /**
  * Type of I/O event notifications.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/11/14.
  */
 public enum EventKey {
@@ -54,5 +54,23 @@ public enum EventKey {
         sb.append("interestOps=").append(interestOps);
         sb.append('}');
         return sb.toString();
+    }
+
+    public static String formatOps(final int ops) {
+        final StringBuilder buffer = new StringBuilder();
+        if ((ops & SelectionKey.OP_READ) > 0) {
+            buffer.append('r');
+        }
+        if ((ops & SelectionKey.OP_WRITE) > 0) {
+            buffer.append('w');
+        }
+        if ((ops & SelectionKey.OP_ACCEPT) > 0) {
+            buffer.append('a');
+        }
+        if ((ops & SelectionKey.OP_CONNECT) > 0) {
+            buffer.append('c');
+        }
+
+        return buffer.toString();
     }
 }

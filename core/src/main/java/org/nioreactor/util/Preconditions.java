@@ -18,7 +18,7 @@ package org.nioreactor.util;
 
 /**
  * Utility class to validation preconditions.
- * <p/>
+ * <p>
  * Created by ribeirux on 26/07/14.
  */
 public final class Preconditions {

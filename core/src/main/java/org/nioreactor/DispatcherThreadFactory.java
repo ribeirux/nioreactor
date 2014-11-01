@@ -20,16 +20,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Default acceptor thread factory.
- * <p/>
+ * Default dispatcher thread factory.
+ * <p>
  * Created by ribeirux on 8/17/14.
  */
-public class DefaultAcceptorThreadFactory implements ThreadFactory {
+public class DispatcherThreadFactory implements ThreadFactory {
 
     private static final AtomicLong COUNTER = new AtomicLong(0);
 
     @Override
     public Thread newThread(final Runnable r) {
-        return new Thread(r, "I/O acceptor " + COUNTER.getAndIncrement());
+        return new Thread(r, "I/O dispatcher " + COUNTER.getAndIncrement());
     }
 }

@@ -18,19 +18,18 @@ package org.nioreactor;
 
 import org.nioreactor.util.Preconditions;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Key that can be used to access {@link org.nioreactor.SessionContext} attributes.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/16/14.
  */
 public final class AttributeKey<T> extends AbstractOption<T> {
 
     // Avoid Thread hostility
-    private static final Set<String> NAMES = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+    private static final Set<String> NAMES = ConcurrentHashMap.newKeySet();
 
     public AttributeKey(final String name, final Class<T> type) {
         super(validateNameUniqueness(name), type);

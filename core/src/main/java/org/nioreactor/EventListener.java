@@ -18,6 +18,8 @@ package org.nioreactor;
 
 /**
  * Event listener.
+ * <p>
+ * Created by ribeirux on 8/11/14.
  */
 // TODO add method: exception(session, Throwable cause)
 public interface EventListener {

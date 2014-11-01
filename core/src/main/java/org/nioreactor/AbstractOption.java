@@ -20,7 +20,7 @@ import org.nioreactor.util.Preconditions;
 
 /**
  * Base option. This class implements general methods that should be used across all different implementations.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/17/14.
  */
 public abstract class AbstractOption<T> {
@@ -31,10 +31,6 @@ public abstract class AbstractOption<T> {
     protected AbstractOption(final String name, final Class<T> type) {
         this.name = Preconditions.checkNotNull(name, "name is null");
         this.type = Preconditions.checkNotNull(type, "type is null");
-    }
-
-    public final String name() {
-        return name;
     }
 
     public T cast(final Object o) {
@@ -55,4 +51,9 @@ public abstract class AbstractOption<T> {
     public final String toString() {
         return name();
     }
+
+    public final String name() {
+        return name;
+    }
+
 }

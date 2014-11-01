@@ -19,81 +19,55 @@ package org.nioreactor.example;
 import org.nioreactor.AttributeKey;
 import org.nioreactor.EventKey;
 import org.nioreactor.EventListener;
-import org.nioreactor.EventListenerFactory;
 import org.nioreactor.ServerBuilder;
 import org.nioreactor.ServerPromise;
 import org.nioreactor.SessionContext;
-import org.nioreactor.SocketOption;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Echo Server example.
- * <p/>
+ * <p>
  * Created by ribeirux on 02/08/14.
  */
 public final class EchoServer {
 
-    private final static Logger LOGGER = Logger.getLogger(EchoServer.class.getName());
+    private final static Logger LOG = Logger.getLogger(EchoServer.class.getName());
+
+    private EchoServer() {
+    }
 
     public static void main(final String[] args) {
         try {
-            final ServerPromise server = ServerBuilder.newBuilder(EchoEventListener.FACTORY)
-                    .workers(6)
-                    .bind(8080);
-
-            // add shutdown hook
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                @Override
-                public void run() {
-                    server.shutdown();
-                    try {
-                        server.await(10, TimeUnit.SECONDS);
-                    } catch (final InterruptedException e) {
-                        // We're shutting down, so just ignore.
-                    }
-                }
-            });
-
-            LOGGER.info("Server started");
-            server.await();
+            final ServerPromise server = ServerBuilder.builder(EchoEventListener::new).bind(8080);
+            LOG.info("Server started. Press any key to shutdown...");
+            System.in.read();
+            server.shutdown();
         } catch (final IOException e) {
-            LOGGER.log(Level.SEVERE, "I/O error: ", e);
-        } catch (final InterruptedException e) {
-            LOGGER.log(Level.WARNING, "Shutdown interrupted: ", e);
+            LOG.log(Level.SEVERE, "I/O error: ", e);
         }
     }
 
     private static final class EchoEventListener implements EventListener {
 
-        private final static Logger LOGGER = Logger.getLogger(EchoEventListener.class.getName());
-
+        public static final int BUFFER_SIZE = 1024;
+        private final static Logger LOG = Logger.getLogger(EchoEventListener.class.getName());
         private static final AttributeKey<ByteBuffer> BUFFER = new AttributeKey<>("BUFFER", ByteBuffer.class);
 
-        public static final int BUFFER_SIZE = 1024;
-
-        public static final EventListenerFactory FACTORY = new EventListenerFactory() {
-            @Override
-            public EventListener create() {
-                // a new listener per worker
-                return new EchoEventListener();
-            }
-        };
-
+        @Override
         public void connected(final SessionContext session) {
-            LOGGER.fine("connected:" + session.remoteAddress());
+            LOG.fine("connected:" + session.remoteAddress());
 
-            session.setSocketTimeout(2000);
             session.putAttribute(BUFFER, ByteBuffer.allocateDirect(BUFFER_SIZE));
             session.interestEvent(EventKey.READ);
         }
 
+        @Override
         public void inputReady(final SessionContext session) {
-            LOGGER.fine("readable:" + session.remoteAddress());
+            LOG.fine("readable:" + session.remoteAddress());
 
             final ByteBuffer buffer = session.getAttribute(BUFFER);
             try {
@@ -110,13 +84,14 @@ public final class EchoServer {
                     }
                 }
             } catch (final IOException e) {
-                LOGGER.log(Level.SEVERE, "I/O error: ", e);
+                LOG.log(Level.SEVERE, "I/O error: ", e);
                 session.close();
             }
         }
 
+        @Override
         public void outputReady(final SessionContext session) {
-            LOGGER.fine("writable:" + session.remoteAddress());
+            LOG.fine("writable:" + session.remoteAddress());
 
             final ByteBuffer buffer = session.getAttribute(BUFFER);
             try {
@@ -128,13 +103,14 @@ public final class EchoServer {
                 }
                 buffer.compact();
             } catch (final IOException ex) {
-                LOGGER.log(Level.SEVERE, "I/O error: ", ex);
+                LOG.log(Level.SEVERE, "I/O error: ", ex);
                 session.close();
             }
         }
 
+        @Override
         public void disconnected(final SessionContext session) {
-            LOGGER.fine("disconnected:" + session.remoteAddress());
+            LOG.fine("disconnected:" + session.remoteAddress());
         }
     }
 }

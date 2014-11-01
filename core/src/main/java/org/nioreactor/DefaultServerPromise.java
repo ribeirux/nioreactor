@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Default implementation of {@link ServerPromise}.
- * <p/>
+ * <p>
  * Created by ribeirux on 8/18/14.
  */
 public class DefaultServerPromise implements ServerPromise {

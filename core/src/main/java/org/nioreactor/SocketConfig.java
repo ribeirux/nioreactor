@@ -18,6 +18,7 @@ package org.nioreactor;
 
 /**
  * Socket configuration provider.
+ * <p>
  * Created by ribeirux on 8/23/14.
  */
 public interface SocketConfig {

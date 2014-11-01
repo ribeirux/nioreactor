@@ -17,9 +17,9 @@
 package org.nioreactor;
 
 /**
- * IOReactorStatus represents an internal status of an I/O reactor.
- *
- * @since 4.0
+ * Status of an I/O reactor.
+ * <p>
+ * Created by ribeirux on 8/10/14.
  */
 public enum ReactorStatus {
 

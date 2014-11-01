@@ -25,7 +25,7 @@ import java.util.Map;
 
 /**
  * Default implementation of {@link org.nioreactor.SocketConfig}.
- *
+ * <p>
  * Created by ribeirux on 8/23/14.
  */
 public final class DefaultSocketConfig implements SocketConfig {
