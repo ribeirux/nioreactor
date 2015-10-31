@@ -40,7 +40,7 @@ public enum EventKey {
 
     private final int interestOps;
 
-    private EventKey(final int interestOps) {
+    EventKey(final int interestOps) {
         this.interestOps = interestOps;
     }
 
@@ -50,10 +50,11 @@ public enum EventKey {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("EventKey{");
-        sb.append("interestOps=").append(interestOps);
-        sb.append('}');
-        return sb.toString();
+        return new StringBuilder("EventKey{")
+                .append("interestOps=")
+                .append(interestOps)
+                .append('}')
+                .toString();
     }
 
     public static String formatOps(final int ops) {

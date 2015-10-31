@@ -62,8 +62,8 @@ public interface SessionContext {
     /**
      * Checks if the session has been terminated.
      *
-     * @return <code>true</code> if the session has been terminated,
-     * <code>false</code> otherwise.
+     * @return {@code true} if the session has been terminated,
+     * {@code false} otherwise.
      */
     boolean isClosed();
 
@@ -79,7 +79,7 @@ public interface SessionContext {
 
     /**
      * Returns the value of the attribute with the given key. The value can be
-     * <code>null</code> if not set.
+     * {@code null} if not set.
      * <p>
      *
      * @param key key of the attribute.

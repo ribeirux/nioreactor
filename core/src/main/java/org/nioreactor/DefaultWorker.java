@@ -113,7 +113,7 @@ public class DefaultWorker implements Runnable {
     }
 
     private void processEvents(final Collection<SelectionKey> selectedKeys) {
-        selectedKeys.stream().forEach(this::processEvent);
+        selectedKeys.forEach(this::processEvent);
         selectedKeys.clear();
     }
 

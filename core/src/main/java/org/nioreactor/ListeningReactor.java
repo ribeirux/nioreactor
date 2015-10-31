@@ -18,12 +18,12 @@ package org.nioreactor;
 
 import org.nioreactor.util.Preconditions;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.channels.CancelledKeyException;
-import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -70,9 +70,9 @@ public class ListeningReactor implements Runnable {
     }
 
     private ServerSocketChannel buildServerChannel() throws IOException {
-        final ServerSocketChannel serverChannel = ServerSocketChannel.open();
+        final ServerSocketChannel newChannel = ServerSocketChannel.open();
         try {
-            final ServerSocket socket = serverChannel.socket();
+            final ServerSocket socket = newChannel.socket();
             socket.setReuseAddress(this.config.option(SO_REUSEADDR));
 
             final int timeout = this.config.option(SO_TIMEOUT);
@@ -85,17 +85,17 @@ public class ListeningReactor implements Runnable {
                 socket.setReceiveBufferSize(rcvBuf);
             }
 
-            serverChannel.configureBlocking(false);
+            newChannel.configureBlocking(false);
 
-            return serverChannel;
+            return newChannel;
         } catch (final IOException ex) {
-            closeChannel(serverChannel);
+            closeChannel(newChannel);
 
             throw ex;
         }
     }
 
-    private void closeChannel(final Channel channel) {
+    private void closeChannel(final Closeable channel) {
         if (channel != null) {
             try {
                 channel.close();
@@ -207,7 +207,7 @@ public class ListeningReactor implements Runnable {
         }
     }
 
-    private void closeSelector(final Selector selector) {
+    private void closeSelector(final Closeable selector) {
         try {
             selector.close();
         } catch (final IOException ex) {

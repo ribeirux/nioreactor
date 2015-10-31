@@ -59,7 +59,7 @@ public final class EchoServer {
 
         @Override
         public void connected(final SessionContext session) {
-            LOG.fine("connected:" + session.remoteAddress());
+            LOG.fine("connected: " + session.remoteAddress());
 
             session.putAttribute(BUFFER, ByteBuffer.allocateDirect(BUFFER_SIZE));
             session.interestEvent(EventKey.READ);
@@ -67,7 +67,7 @@ public final class EchoServer {
 
         @Override
         public void inputReady(final SessionContext session) {
-            LOG.fine("readable:" + session.remoteAddress());
+            LOG.fine("readable: " + session.remoteAddress());
 
             final ByteBuffer buffer = session.getAttribute(BUFFER);
             try {
@@ -91,7 +91,7 @@ public final class EchoServer {
 
         @Override
         public void outputReady(final SessionContext session) {
-            LOG.fine("writable:" + session.remoteAddress());
+            LOG.fine("writable: " + session.remoteAddress());
 
             final ByteBuffer buffer = session.getAttribute(BUFFER);
             try {
@@ -110,7 +110,7 @@ public final class EchoServer {
 
         @Override
         public void disconnected(final SessionContext session) {
-            LOG.fine("disconnected:" + session.remoteAddress());
+            LOG.fine("disconnected: " + session.remoteAddress());
         }
     }
 }

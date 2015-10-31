@@ -50,10 +50,11 @@ public final class DefaultSocketConfig implements SocketConfig {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("DefaultSocketConfig{");
-        sb.append("socketOptions=").append(socketOptions);
-        sb.append('}');
-        return sb.toString();
+        return new StringBuilder("DefaultSocketConfig{")
+                .append("socketOptions=")
+                .append(socketOptions)
+                .append('}')
+                .toString();
     }
 
     public static final class Builder {
